@@ -231,6 +231,68 @@ func TestWithReset(t *testing.T) {
 	}
 }
 
+func TestNetworkAddressesOfUnusualLength(t *testing.T) {
+	eui64 := net.HardwareAddr{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef}
+	fourBytes := net.HardwareAddr{0x01, 0x23, 0x45, 0x67}
+	tests := []struct {
+		name string
+		log  func(e *Event) *Event
+		want string
+	}{
+		{
+			"nil IPAddr",
+			func(e *Event) *Event { return e.IPAddr("k", nil) },
+			`{"k":"<nil>"}`,
+		},
+		{
+			"three byte IPAddr",
+			func(e *Event) *Event { return e.IPAddr("k", net.IP{1, 2, 3}) },
+			`{"k":"?010203"}`,
+		},
+		{
+			"nil entry in IPAddrs",
+			func(e *Event) *Event { return e.IPAddrs("k", []net.IP{{127, 0, 0, 1}, nil}) },
+			`{"k":["127.0.0.1","<nil>"]}`,
+		},
+		{
+			"nil IPAddr in array",
+			func(e *Event) *Event { return e.Array("k", Arr().IPAddr(nil)) },
+			`{"k":["<nil>"]}`,
+		},
+		{
+			"nil MACAddr",
+			func(e *Event) *Event { return e.MACAddr("k", nil) },
+			`{"k":""}`,
+		},
+		{
+			"EUI-64 MACAddr",
+			func(e *Event) *Event { return e.MACAddr("k", eui64) },
+			`{"k":"01:23:45:67:89:ab:cd:ef"}`,
+		},
+		{
+			"four byte MACAddr",
+			func(e *Event) *Event { return e.MACAddr("k", fourBytes) },
+			`{"k":"01:23:45:67"}`,
+		},
+		{
+			"nil MACAddr in array",
+			func(e *Event) *Event { return e.Array("k", Arr().MACAddr(nil)) },
+			`{"k":[""]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			l := New(out)
+			tt.log(l.Log()).Msg("")
+			want := tt.want + "\n"
+			if got := decodeIfBinaryToString(out.Bytes()); got != want {
+				t.Errorf("invalid log output:\ngot:  %q\nwant: %q", got, want)
+			}
+		})
+	}
+}
+
 func TestFieldsMap(t *testing.T) {
 	out := &bytes.Buffer{}
 	log := New(out)

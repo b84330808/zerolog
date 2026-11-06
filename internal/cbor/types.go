@@ -449,6 +449,11 @@ func (e Encoder) AppendType(dst []byte, i interface{}) []byte {
 
 // AppendIPAddr adds a net.IP IPv4 or IPv6 address into the dst byte array.
 func (e Encoder) AppendIPAddr(dst []byte, ip net.IP) []byte {
+	if len(ip) != net.IPv4len && len(ip) != net.IPv6len {
+		// Tag 260 only holds an address of a known length; anything else
+		// (a nil IP, for one) is written as text, like the JSON encoder does.
+		return e.AppendString(dst, ip.String())
+	}
 	dst = append(dst, majorTypeTags|additionalTypeIntUint16)
 	dst = append(dst, byte(additionalTypeTagNetworkAddr>>8))
 	dst = append(dst, byte(additionalTypeTagNetworkAddr&0xff))
@@ -509,6 +514,12 @@ func (e Encoder) AppendIPPrefixes(dst []byte, pfxs []net.IPNet) []byte {
 
 // AppendMACAddr encodes and inserts a Hardware (MAC) address.
 func (e Encoder) AppendMACAddr(dst []byte, ha net.HardwareAddr) []byte {
+	if len(ha) != 6 {
+		// Tag 260 only holds a 48-bit MAC address; anything else (a nil
+		// address or an EUI-64, for example) is written as text, like the
+		// JSON encoder does. A 4 or 16 byte address would otherwise decode as an IP.
+		return e.AppendString(dst, ha.String())
+	}
 	dst = append(dst, majorTypeTags|additionalTypeIntUint16)
 	dst = append(dst, byte(additionalTypeTagNetworkAddr>>8))
 	dst = append(dst, byte(additionalTypeTagNetworkAddr&0xff))
